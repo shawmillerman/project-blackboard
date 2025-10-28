@@ -1,0 +1,22 @@
+Once the _____ is open, paste this into the prompt:
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# macOS junk
+.DS_Store
+
+# Logs
+*.log
+
+# IDE settings
+.vscode/
+.idea/
+
