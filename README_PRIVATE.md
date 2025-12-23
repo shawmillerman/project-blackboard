@@ -9,6 +9,17 @@ This repo is not intended for public sharing.
 
 ---
 
+## Recent Changes (12/23/25)
+
+- Renamed Tier 1 endpoint from `/tier1/rubric-answer` to `/tier1/course-answer`
+  - Old route retained as a hidden alias for backward compatibility
+- Unified FastAPI entrypoint so all routes are registered in `app/server.py`
+- Added file header conventions to clarify runtime vs shim vs experimental code
+- Normalized documentation to reflect current architecture
+
+This change set explains why multiple files were modified together.
+
+
 ## Repo posture
 
 - This repo is the **source of truth** for the application logic.
