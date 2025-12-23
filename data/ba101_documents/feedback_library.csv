@@ -1,0 +1,95 @@
+course,assignment_type,category,tone,severity,feedback
+BA101,reflection,clarity,encouraging,minor,Great insights! Try to simplify your second paragraph. Breaking that long sentence into two would make your main point even sharper.
+BA101,case_study,missing_examples,encouraging,minor,You have a solid grasp of the chapter concepts. Including one specific example from the Week 8 reading would really bring this analysis to life.
+BA101,reflection,light_structure,encouraging,minor,I love your perspective here. Adding a quick transition sentence between your intro and the first body paragraph would help the flow.
+BA101,case_study,clarity,encouraging,minor,Your summary of the market trend is right on. Just a bit more precision in your definition of 'market share' would make this perfect.
+BA101,reflection,missing_examples,encouraging,minor,Excellent point about leadership styles! Can you think of a specific leader from this week's material who fits this description?
+BA101,case_study,light_structure,encouraging,minor,Strong work overall. Consider using bullet points for the SWOT breakdown to make it even easier for a manager to skim.
+BA101,reflection,clarity,encouraging,minor,Your writing style is very engaging. Just double-check your explanation of ROI to ensure the reader follows your logic clearly.
+BA101,case_study,missing_examples,encouraging,minor,This is a great reflection. A brief mention of the Patagonia case study would provide the 'real-world' evidence this needs. And connecting to the course material would result in full credit. 
+BA101,reflection,light_structure,encouraging,minor,You've hit all the rubric requirements. A slightly more formal concluding sentence would tie your great ideas together nicely.
+BA101,case_study,clarity,encouraging,minor,You clearly understand the material. Try to avoid using 'etc.' and instead list the final specific variable for total clarity.
+BA101,reflection,missing_examples,encouraging,minor,Great argument. Adding a quick statistic from the textbook would make it even more.
+BA101,case_study,light_structure,encouraging,minor,Good use of headers. Just make sure the 'Conclusion' header starts on its own line so the reader isn't distracted by a formatting error. 
+BA101,reflection,clarity,encouraging,minor,I really enjoyed your ethics analysis. Just ensure your use of 'sustainability' stays consistent throughout the paper.
+BA101,case_study,missing_examples,encouraging,minor,Solid analysis of the supply chain. What’s one example of a 'bottleneck' you noticed in the reading that supports this?
+BA101,reflection,light_structure,encouraging,minor,You have a very strong voice. Using a few more signposting words like 'Furthermore' or 'Conversely' would improve readability.
+BA101,case_study,clarity,encouraging,minor,You’ve captured the essence of the prompt. Just be sure to define your acronyms (like CRM) the first time you use them.
+BA101,reflection,missing_examples,encouraging,minor,Your connections to personal experience are wonderful. Adding one link to the course's 'Triple Bottom Line' theory would elevate this.
+BA101,case_study,light_structure,encouraging,minor,This is very well researched. A quick summary at the start of page 2 would help with reader focus.
+BA101,reflection,clarity,encouraging,minor,Nice work! Just clarify if you are referring to the local or global market in your third paragraph to avoid ambiguity.
+BA101,case_study,missing_examples,encouraging,minor,You've identified the problem well. Can you pull one data point from the Week 10 charts to prove the impact?
+BA101,reflection,light_structure,encouraging,minor,Great effort here. Using bold text for your three main takeaways would make your reflection much more impactful.
+BA101,case_study,clarity,encouraging,minor,Your logic is sound. Just make sure the distinction between 'fixed' and 'variable' costs is explicitly clear in your breakdown.
+BA101,reflection,missing_examples,encouraging,minor,This is a thoughtful submission. Illustrating your point with a quick mention of the Starbucks case would strengthen your argument.
+BA101,case_study,light_structure,encouraging,minor,You have a good flow. Ensure that each paragraph only focuses on one main idea to keep your structure tight.
+BA101,reflection,clarity,encouraging,minor,Excellent depth! Just be careful with word choice in the intro: 'fiscal' and 'monetary' have different meanings in this context.
+BA101,case_study,missing_examples,encouraging,minor,"You are on the right track. Adding a specific example of a competitor’s ""move"" would make your SWOT analysis more concrete."
+BA101,reflection,light_structure,encouraging,minor,Strong reflection. Adding a clear 'Thesis Statement' in your first paragraph would help anchor the rest of your thoughts.
+BA101,case_study,clarity,encouraging,minor,Very insightful. Just make sure your final recommendation is explicitly stated rather than implied.
+BA101,reflection,missing_examples,encouraging,minor,You understand the core themes perfectly. I’d love to see one example of how this applies to the current tech industry.
+BA101,case_study,light_structure,encouraging,minor,Good analysis. Just a reminder to double-space your paragraphs to meet the standard business formatting requirements.
+BA101,reflection,partially_correct,neutral,moderate,"You have the right idea about inflation, but the link to interest rates is a bit inverted. Take another look at the Week 9 slides."
+BA101,case_study,needs_depth,neutral,moderate,"You've identified the main issue, but I need you to go deeper into *why* this occurred. What were the underlying market drivers?"
+BA101,reflection,weak_execution,neutral,moderate,"The idea to use a circular economy model is excellent, but the paper lacks the data needed to support why that model works here."
+BA101,case_study,partially_correct,neutral,moderate,"You correctly identified the 'Strengths,' but the 'Opportunities' section feels a bit like a repeat. Try to look at external factors."
+BA101,reflection,needs_depth,neutral,moderate,"This is a good summary of the reading, but the prompt asks for your critical analysis. What are the potential drawbacks of this strategy?"
+BA101,case_study,weak_execution,neutral,moderate,Your writing this week is a bit too conversational. Try to use more of the terminology we’ve learned.
+BA101,reflection,partially_correct,neutral,moderate,"You’ve described the symptoms of the problem well, but your analysis doesn't match the topics we're studying."
+BA101,case_study,needs_depth,neutral,moderate,"This is a solid start, but you stopped just as it was getting interesting. Elaborate on how the CEO should handle the media backlash."
+BA101,case_study,partially_correct,neutral,moderate,"Your calculation for the break-even point is correct, but your interpretation of what that number means for the company is slightly off."
+BA101,reflection,needs_depth,neutral,moderate,"You mentioned the ethical dilemma, but only briefly. Spend more time discussing the impact on the local community."
+BA101,case_study,weak_execution,neutral,moderate,"The content is good, but the lack of headings makes it very difficult to see where one section ends and the next begins."
+BA101,reflection,partially_correct,neutral,moderate,"You've grasped the concept of 'Value Proposition,' but you've confused it with 'Brand Image' in several places. They are distinct concepts."
+BA101,case_study,needs_depth,neutral,moderate,Good identification of the key players. Don't forget to explain the *power dynamics* between them. Don't forget to reference the rubric before submitting. 
+BA101,reflection,weak_execution,neutral,moderate,"You make great points, but they are buried in very dense paragraphs. Better organization would help your grade significantly."
+BA101,case_study,partially_correct,neutral,moderate,"The marketing mix you proposed is creative, but it exceeds the budget constraints mentioned in the case study prompt. But kudos for creativity! "
+BA101,reflection,needs_depth,neutral,moderate,"You’ve answered the 'what' and the 'who,' but you missed the 'how.' How will the company implement these changes?"
+BA101,case_study,weak_execution,neutral,moderate,"Your research is evident, but the paper feels more like a list of facts than a cohesive argument. Try to synthesize your findings."
+BA101,reflection,partially_correct,neutral,moderate,"You correctly noted the shift in consumer behavior, but your explanation of the cause doesn't align with the data in the text."
+BA101,case_study,needs_depth,neutral,moderate,"This is a fine overview. For full credit, you would address the long-term implications, not just the short-term fixes."
+BA101,reflection,weak_execution,neutral,moderate,"You have the right intuition, but you have to cite specific chapters where these theories originate."
+BA101,case_study,partially_correct,neutral,moderate,The first half of your analysis is perfect. The second half seems to be answering the wrong question.
+BA101,reflection,needs_depth,neutral,moderate,I’d love to see more depth here. Don't just agree with the author. Could their logic be flawed? 
+BA101,case_study,weak_execution,neutral,moderate,"You’ve gathered the right information, but the formatting (font sizes, margins) takes away from the professionalism. Review the style guide."
+BA101,reflection,partially_correct,neutral,moderate,"Your use of the term 'equity' is partially correct, but in this context, we are looking at it from a balance sheet perspective."
+BA101,case_study,needs_depth,neutral,moderate,"You identified the risk, but not how they might address the risk. What should the manager do if this risk becomes a reality?"
+BA101,reflection,weak_execution,neutral,moderate,"The core idea is there, but the response is significantly under the required word count. Not enough detail."
+BA101,case_study,partially_correct,neutral,moderate,Your SWOT is a little unbalanced. You have 10 strengths but only 1 weakness. Aim for a more realistic middle ground.
+BA101,reflection,needs_depth,neutral,moderate,"You clearly understand the topic, but your reflection stays on the surface. How does this change your view of the industry?"
+BA101,case_study,weak_execution,neutral,moderate,"Good ideas, but there are several typos and grammatical errors that detract from your professional argument."
+BA101,reflection,partially_correct,neutral,moderate,"You correctly identified the stakeholders, but you missed the 'Secondary' stakeholders like the local government."
+BA101,case_study,needs_depth,neutral,moderate,"You provided a good description. Now, move into 'Analysis' mode by explaining the impact of these findings."
+BA101,reflection,weak_execution,neutral,moderate,The structure of your argument is a bit circular. Try to move from your evidence directly to your conclusion without backtracking.
+BA101,case_study,partially_correct,neutral,moderate,"Your financial analysis is good, but you used the wrong year's data for your comparison."
+BA101,reflection,needs_depth,neutral,moderate,"This is a bit too descriptive. The prompt asks for a 'reflection,' which requires more of your own perspective and critique."
+BA101,case_study,misunderstanding,direct,major,"This analysis focuses on B2C strategies, but the company in the case study is strictly B2B. This changes the entire marketing approach."
+BA101,reflection,off_topic,direct,major,"Your paper discusses general economic history, but the prompt specifically asked you to reflect on last week's guest speaker."
+BA101,case_study,incorrect_definition,direct,major,You are using the term 'Gross Margin' when you actually mean 'Net Profit.' These are different metrics.
+BA101,reflection,misunderstanding,direct,major,"You argued that the company has no competition, but this is not the case in a free market. Re-read the section on 'Indirect Competition'."
+BA101,case_study,off_topic,direct,major,This response addresses the wrong case study. Please ensure you are looking at the 'Global Logistics' prompt for Week 10.
+BA101,reflection,incorrect_definition,direct,major,"Your definition of 'Limited Liability' is incorrect. It protects the owners' personal assets, not the company's debts."
+BA101,case_study,misunderstanding,direct,major,The strategy you proposed is illegal under the current antitrust laws mentioned in Chapter 4. Take a look at the legal section and make sure you understand which law(s) might prevent your recommendation from being approved by regulators. 
+BA101,reflection,off_topic,direct,major,This reflection is about your personal life rather than the business concepts. Please rewrite this to focus on the course material.
+BA101,case_study,incorrect_definition,direct,major,"Unfortunately, you've confused 'Revenue' with 'Profit' throughout your entire spreadsheet. This has led to an incorrect final recommendation. "
+BA101,reflection,misunderstanding,direct,major,You stated that the Federal Reserve sets all retail interest rates. This is a common misconception. Take a look at the slides on how the 'Fed Funds Rate' works.
+BA101,case_study,off_topic,direct,major,"You spent much of your content talking about the CEO, but the rubric requires an analysis of the company's *operations*."
+BA101,reflection,incorrect_definition,direct,major,"Venture Capital' and 'Angel Investing' are not the same thing. You've used them interchangeably here, which prevents full credit."
+BA101,case_study,misunderstanding,direct,major,"Your SWOT analysis lists 'High Taxes' as a Strength. Taxes are almost always an external Threat or a cost, not an internal Strength."
+BA101,reflection,off_topic,direct,major,"The prompt asked for a reflection on 'Teamwork,' but your paper is about 'Product Design.' Be sure to read the directions carefully and stick to the assigned topic."
+BA101,case_study,incorrect_definition,direct,major,You've defined 'Outsourcing' as moving jobs overseas. That is 'Offshoring.' Outsourcing is really just hiring an external party.
+BA101,reflection,misunderstanding,direct,major,You’ve described a 'Monopoly' as a market with many sellers. That is the definition of 'Perfect Competition.' Please review Chapter 3.
+BA101,case_study,off_topic,direct,major,"This analysis focuses on the 1990s, but the case study specifically asks for a strategy based on the 2024 market data provided. Be sure to read the instructions carefully. "
+BA101,reflection,incorrect_definition,direct,major,"A 'Balance Sheet' does not show a company's income over time. That is the 'Income Statement.' Take a look at that section in the slides again. There's a nice, quick reference chart you can use to remind yourself. "
+BA101,case_study,misunderstanding,direct,major,"You’ve suggested that the company lower prices to increase brand prestige. Usually, lower prices *decrease* perceived prestige (Price-Quality signaling)."
+BA101,reflection,off_topic,direct,major,Your entire response is a copy-paste of the textbook definitions without any of the required personal reflection or application.
+BA101,case_study,incorrect_definition,direct,major,You've defined 'Ethical Relativism' as the 'Universal Moral Code.' These are actually opposing viewpoints.
+BA101,reflection,misunderstanding,direct,major,You stated that small businesses don't need to worry about marketing but almost every business needs a marketing strategy.
+BA101,case_study,off_topic,direct,major,"The prompt asked for a 5-year growth plan, but you provided a 10-year history of the company's past failures. Be sure to read the instructions closely. "
+BA101,reflection,incorrect_definition,direct,major,You’ve confused 'Assets' and 'Liabilities' in your reflection on personal finance. 
+BA101,case_study,misunderstanding,direct,major,"Your analysis assumes the company is a non-profit, but the prompt clearly states it is a for-profit corporation. The goals are different."
+BA101,reflection,off_topic,direct,major,"This paper discusses your feelings about the course material in general, but the assignment was to analyze a specific ethical scenario."
+BA101,case_study,incorrect_definition,direct,major,You defined 'Wholesale' as selling directly to the end consumer. That is 'Retail.' Be sure to review the distribution channel diagrams.
+BA101,reflection,misunderstanding,direct,major,You argued that inflation makes everything cheaper for everyone. This is the opposite of what happens. Inflation makes everything expensive. 
+BA101,case_study,off_topic,direct,major,You submitted the instructions for the assignment instead of your actual analysis. Please feel free to upload the correct file before the assignment end date.
+BA101,reflection,incorrect_definition,direct,major,Your definition of a 'Sole Proprietorship' includes having a Board of Directors. Only Corporations have Boards.
