@@ -1,3 +1,6 @@
+# Early scratch file used to validate Python + OpenAI setup.
+# Not part of the Project Blackboard runtime.
+
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
