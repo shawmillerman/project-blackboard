@@ -1,3 +1,9 @@
+#
+#Entrypoint shim.
+#Imports the canonical FastAPI app from app.server for uvicorn compatibility.
+#
+
+
 from fastapi import FastAPI
 from openai import OpenAI
 import os

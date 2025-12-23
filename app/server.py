@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 import uuid
 import time
 import logging
@@ -17,6 +22,8 @@ from .embed import embed_texts
 from .qa import answer_from_rubric, suggest_feedback
 
 from contextlib import asynccontextmanager
+
+from app.calibration_api import router as calibration_router
 
 # -------------------------------------------------
 # Environment + App
@@ -112,8 +119,8 @@ def health():
 # -------------------------------------------------
 # Tier 1 MVP – Rubric Answer
 # -------------------------------------------------
-
-@app.get("/tier1/rubric-answer")
+@app.get("/tier1/rubric-answer", include_in_schema=False)
+@app.get("/tier1/course-answer")
 def tier1_rubric_answer(
     request: Request,
     question: str = Query(..., min_length=3),

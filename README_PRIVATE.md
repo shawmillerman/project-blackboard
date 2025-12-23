@@ -1,7 +1,8 @@
 # Project Blackboard – Private README
 
 This repository is intentionally **private**.
-It contains the canonical implementation of Project Blackboard’s FastAPI backend,
+It contains the canonical implementation of Project Blackboard’s FastAPI 
+backend,
 including ingestion, retrieval, calibration, and grading logic.
 
 This repo is not intended for public sharing.
@@ -12,8 +13,10 @@ This repo is not intended for public sharing.
 
 - This repo is the **source of truth** for the application logic.
 - IP protection is achieved by keeping the repo private.
-- No secrets are committed; all configuration is via environment variables.
-- Any future public-facing materials should live in a separate, stripped-down repo.
+- No secrets are committed; all configuration is via environment 
+variables.
+- Any future public-facing materials should live in a separate, 
+stripped-down repo.
 
 ---
 
@@ -29,7 +32,8 @@ This repo is not intended for public sharing.
   - Contains no logic.
 
 - **Documentation**
-  - `docs/code_map.md` describes request flow, ingestion, retrieval, and citations.
+  - `docs/code_map.md` describes request flow, ingestion, retrieval, and 
+citations.
 
 ---
 
@@ -46,7 +50,8 @@ This repo is not intended for public sharing.
   - calibration documents
 - Notes:
   - This endpoint was formerly named `/tier1/rubric-answer`.
-  - The old route is retained as a hidden alias for backward compatibility.
+  - The old route is retained as a hidden alias for backward 
+compatibility.
 
 ### Tier 2 – Feedback Suggest
 - **Endpoints:**
@@ -87,7 +92,8 @@ This repo is not intended for public sharing.
 Seed documents for BA101 live in:
 - `data/ba101_documents/`
 
-These are **test fixtures only** and are not ingested unless explicitly requested.
+These are **test fixtures only** and are not ingested unless explicitly 
+requested.
 
 ---
 
@@ -98,14 +104,5 @@ These are **test fixtures only** and are not ingested unless explicitly requeste
   - `app/qa.py`
 - Citation labels use prefixes like:
   - `[R1]` for rubric/reference hits
-  - `[F1]` for feedback library hits
-- Server logs include citation counts for observability.
+  - `[F1]` for feedback library h
 
----
-
-## How to run locally
-
-1. Create and activate virtual environment
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt

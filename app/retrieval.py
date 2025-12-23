@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 from psycopg.types.json import Json

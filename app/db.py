@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 import os
 import psycopg
 from dotenv import load_dotenv

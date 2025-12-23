@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 from typing import Any, Dict, Optional, List
 from pypdf import PdfReader
 from .chunking import split_by_tokens

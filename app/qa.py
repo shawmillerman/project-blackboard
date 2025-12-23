@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 from typing import Optional, Dict, Any, List, Tuple
 from openai import OpenAI
 

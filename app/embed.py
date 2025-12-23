@@ -1,3 +1,8 @@
+#
+# Runtime module.
+# Canonical FastAPI app, routes, and request flow live here.
+#
+
 from typing import List
 from openai import OpenAI
 from .config import OPENAI_API_KEY, EMBED_MODEL
