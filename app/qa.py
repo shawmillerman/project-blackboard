@@ -189,5 +189,6 @@ Calibration examples (anchors):
         "input": question_or_submission,
         "suggested_feedback": resp.choices[0].message.content,
         "citations": rubric_cites + feedback_cites + calibration_cites,
-
+        "feedback_hits": feedback_hits,
     }
+
