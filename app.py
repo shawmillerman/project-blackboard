@@ -1,8 +1,9 @@
 #
-#Entrypoint shim.
-#Imports the canonical FastAPI app from app.server for uvicorn compatibility.
+# Entrypoint shim.
+# Imports FastAPI app from app.server for uvicorn compatibility.
+#   -`app.py` Exists only so `uvicorn app:app` continues to work.
+#   - Contains no logic.
 #
-
 
 from fastapi import FastAPI
 from openai import OpenAI
