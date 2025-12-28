@@ -5,6 +5,7 @@
 import uuid
 import time
 import logging
+import os
 from .calibration_api import router as calibration_router
 from collections import deque
 from typing import Optional, Any, Dict, List
@@ -15,7 +16,8 @@ from .db import ensure_calibration_table, insert_calibration_examples
 from .embed import embed_texts
 from .qa import answer_from_rubric, suggest_feedback
 from contextlib import asynccontextmanager
-from app.calibration_api import router as calibration_router
+from .grading import compute_score_range_from_calibration_hits
+from .config import ENABLE_SCORE_RANGE, DEMO_MODE
 
 # -------------------------------------------------
 # Environment + App
@@ -82,6 +84,7 @@ class FeedbackSuggestRequest(BaseModel):
     course: Optional[str] = Field(None, description="Course identifier, e.g., BA101")
     assignment_id: Optional[str] = Field(None, description="Assignment id for calibration examples, ex: business_activity_weekly")
     assignment_type: Optional[str] = Field(None, description="Assignment type, e.g., reflection or case_study")
+    points_possible: Optional[float] = Field(40.0, ge=1)
     category: Optional[str] = Field(None, description="Feedback category, e.g., clarity or missing_examples")
     severity: Optional[str] = Field(None, description="Severity level, e.g., minor or major")
     top_k_rubric: int = Field(6, ge=1, le=20)
@@ -175,7 +178,11 @@ def tier2_feedback_suggest(
 # Tier 2 MVP – Feedback Suggestion (POST – product)
 # -------------------------------------------------
 
-app.post("/tier2/feedback-suggest", response_model=FeedbackSuggestResponse)
+@app.post(
+    "/tier2/feedback-suggest",
+    response_model=FeedbackSuggestResponse,
+    response_model_exclude_none=True,
+)
 def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestRequest):
     request_id = str(uuid.uuid4())
     t0 = time.time()
@@ -183,7 +190,8 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
     _rate_limit_or_raise(request)
 
     # ---- metadata filtering ----
-    metadata = {"course": (payload.course or "BA101")}
+    course_norm = (payload.course or "BA101").strip().upper()
+    metadata = {"course": course_norm}
     if payload.assignment_type:
         metadata["assignment_type"] = payload.assignment_type
     if payload.category:
@@ -209,20 +217,20 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
             request.client.host if request.client else None,
         )
         raise HTTPException(status_code=500, detail="Feedback generation failed")
-
-    # ---- optional grading pipeline (OFF for MVP) ----
-    ENABLE_SCORE_RANGE = False
-
+        
     if ENABLE_SCORE_RANGE:
-        points_possible = float(getattr(payload, "points_possible", 40.0))
-        low, high, score_text = compute_score_range_from_feedback_hits(
-            result.get("feedback_hits", []),
+        points_possible = float(payload.points_possible or 40.0)
+        low, high, score_text = compute_score_range_from_calibration_hits(
+            result.get("calibration_hits", []),
             points_possible,
         )
-        result["score_range_text"] = score_text
-        result["score_low"] = low
-        result["score_high"] = high
-        result["points_possible"] = points_possible
+
+        if not DEMO_MODE:
+            result["score_range_text"] = score_text
+            result["score_low"] = low
+            result["score_high"] = high
+            result["points_possible"] = points_possible
+
 
     # ---- logging + cleanup ----
     elapsed_ms = int((time.time() - t0) * 1000)
@@ -242,7 +250,9 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
     )
 
     result.pop("feedback_hits", None)
+    result.pop("calibration_hits", None)
     return result
+
 
 
     

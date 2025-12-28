@@ -1,8 +1,4 @@
-#
-# Runtime module.
-# Canonical FastAPI app, routes, and request flow live here.
-#
-
+import os
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 from psycopg.types.json import Json
@@ -14,6 +10,17 @@ ALLOWED_TABLES = {"rubric_chunks", "feedback_library", "student_submissions", "c
 
 def _vec(v: List[float]) -> str:
     return "[" + ",".join(str(x) for x in v) + "]"
+
+
+def _maybe_force_seqscan(cur) -> None:
+    """
+    MVP debug switch. Use ONLY for stability testing without ANN indexes.
+    Set FORCE_SEQSCAN=true locally. Keep it false in prod.
+    """
+    if os.getenv("FORCE_SEQSCAN", "false").lower() == "true":
+        cur.execute("set enable_indexscan=off")
+        cur.execute("set enable_bitmapscan=off")
+        cur.execute("set enable_seqscan=on")
 
 
 def retrieve_similar(
@@ -29,47 +36,41 @@ def retrieve_similar(
     vec = _vec(query_embedding)
 
     where_clauses: List[str] = []
-    params: List[Any] = []
-
-    # for (embedding <=> %s::vector) in SELECT
-    params.append(vec)
+    filter_params: List[Any] = []
 
     if source_filter:
         where_clauses.append("source = %s")
-        params.append(source_filter)
+        filter_params.append(source_filter)
 
     if metadata_filter:
-        # jsonb containment: metadata has at least these key/value pairs
         where_clauses.append("metadata @> %s::jsonb")
-        params.append(Json(metadata_filter))
+        filter_params.append(Json(metadata_filter))
 
-    where_sql = ""
-    if where_clauses:
-        where_sql = "where " + " and ".join(where_clauses)
+    where_sql = ("where " + " and ".join(where_clauses)) if where_clauses else ""
 
     sql = f"""
         select id, source, chunk_index, content, metadata,
-               (embedding <=> %s::vector) as distance
+               cosine_distance(embedding, %s::vector) as distance
         from public.{table}
         {where_sql}
-        order by embedding <=> %s::vector
+        order by cosine_distance(embedding, %s::vector)
         limit %s
     """
 
-    # for ORDER BY distance + LIMIT
-    params.append(vec)
-    params.append(top_k)
+
+
+    # Placeholder order must match:
+    # 1) vec for SELECT distance
+    # 2) any filter params
+    # 3) vec for ORDER BY
+    # 4) limit
+    params: List[Any] = [vec] + filter_params + [vec, top_k]
 
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            # MVP stability: force sequential scan (no ANN indexes)
-            cur.execute("set enable_indexscan=off")
-            cur.execute("set enable_bitmapscan=off")
-            cur.execute("set enable_seqscan=on")
-
+            _maybe_force_seqscan(cur)
             cur.execute(sql, params)
             return cur.fetchall()
-
 
 def retrieve_calibration_examples(
     query_embedding: List[float],
@@ -80,30 +81,64 @@ def retrieve_calibration_examples(
     vec = _vec(query_embedding)
 
     where_clauses: List[str] = ["assignment_id = %s"]
-    params: List[Any] = [assignment_id]
+    where_params: List[Any] = [assignment_id]
 
     if metadata_filter:
         where_clauses.append("metadata @> %s::jsonb")
-        params.append(Json(metadata_filter))
+        where_params.append(Json(metadata_filter))
 
     where_sql = "where " + " and ".join(where_clauses)
 
     sql = f"""
-        select id, source, assignment_id, submission_text, feedback_text, grade_numeric, metadata,
-               (embedding <=> %s::vector) as distance
+        select
+            id, source, assignment_id, submission_text, feedback_text, grade_numeric, metadata,
+            cosine_distance(embedding, %s::vector) as distance
         from public.calibration_examples
         {where_sql}
-        order by embedding <=> %s::vector
+        order by distance
         limit %s
     """
 
-    params_for_select = [vec] + params + [vec, top_k]
+    params: List[Any] = [vec] + where_params + [top_k]
 
     with get_conn() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("set enable_indexscan=off")
-            cur.execute("set enable_bitmapscan=off")
-            cur.execute("set enable_seqscan=on")
-
-            cur.execute(sql, params_for_select)
+            _maybe_force_seqscan(cur)
+            cur.execute(sql, params)
             return cur.fetchall()
+
+def retrieve_calibration_examples_by_course(
+    query_embedding: List[float],
+    course: str,
+    top_k: int = 5,
+    metadata_filter: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    vec = _vec(query_embedding)
+
+    where_clauses: List[str] = ["metadata @> %s::jsonb"]
+    where_params: List[Any] = [Json({"course": course})]
+
+    if metadata_filter:
+        where_clauses.append("metadata @> %s::jsonb")
+        where_params.append(Json(metadata_filter))
+
+    where_sql = "where " + " and ".join(where_clauses)
+
+    sql = f"""
+        select
+            id, source, assignment_id, submission_text, feedback_text, grade_numeric, metadata,
+            cosine_distance(embedding, %s::vector) as distance
+        from public.calibration_examples
+        {where_sql}
+        order by distance
+        limit %s
+    """
+
+    params: List[Any] = [vec] + where_params + [top_k]
+
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            _maybe_force_seqscan(cur)
+            cur.execute(sql, params)
+            return cur.fetchall()
+
