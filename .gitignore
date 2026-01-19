@@ -10,6 +10,7 @@ env/
 # Python cache / bytecode
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 
 # -----------------------
@@ -45,6 +46,11 @@ htmlcov/
 # -----------------------
 *.log
 logs/
+
+# -----------------------
+# Batch processing artifacts
+# -----------------------
+artifacts/
 
 # -----------------------
 # IDE settings
