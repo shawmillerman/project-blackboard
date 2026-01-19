@@ -191,3 +191,24 @@
 **P2: Database migration safety**
 - Current schema includes rubric_id, assignment_id per submission. Ensure all existing submissions get tagged on upgrade.
 - Test rollback scenario.
+
+## Development Workflow & Quality
+
+**P2: Pre-commit hooks**
+- Install pre-commit framework with black (formatter), flake8 (linter), mypy (type checker)
+- Add hooks for: check-added-large-files, detect-private-key, check-merge-conflict
+- Prevents common mistakes before commits reach remote
+- Config file: .pre-commit-config.yaml
+
+**P2: CI/CD Pipeline**
+- GitHub Actions workflow to run tests on push/PR
+- Run pytest suite, linting checks, type checking
+- Provide pass/fail status badges on PRs
+- Config file: .github/workflows/test.yml
+- Blocks merge if tests fail (optional enforcement)
+
+**P2: Branch protection rules**
+- Require PR review before merge to main
+- Require CI checks to pass
+- Enforce linear history (rebase only)
+- No direct commits to production branches
