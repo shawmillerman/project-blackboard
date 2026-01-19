@@ -2,12 +2,14 @@
 
 This repository is intentionally **private**.
 It contains the canonical implementation of Project Blackboard’s FastAPI 
-backend,
-including ingestion, retrieval, calibration, and grading logic.
+backend, including ingestion, retrieval, calibration, and grading logic.
 
 This repo is not intended for public sharing.
 
 ---
+## Having trouble starting the server?
+See `TROUBLESHOOTING.md` for a fast checklist.
+
 
 ## Recent Changes (12/23/25)
 
@@ -18,7 +20,7 @@ This repo is not intended for public sharing.
 - Normalized documentation to reflect current architecture
 
 This change set explains why multiple files were modified together.
-
+# End of December 23 changes ------
 
 ## Repo posture
 
@@ -116,4 +118,28 @@ requested.
 - Citation labels use prefixes like:
   - `[R1]` for rubric/reference hits
   - `[F1]` for feedback library h
+
+---
+
+## Batch Grading (Training Data)
+
+- Purpose: Grade real submissions and store grading traces (training data).
+- Server: ensure the API is running locally.
+
+- Start server:
+  - `python -m uvicorn app.server:app --reload`
+
+  - `python scripts/grade_batch.py <SUBMISSIONS_DIR> <ASSIGNMENT_ID> <COURSE> --csv-out artifacts/grades.csv`
+  - Example:
+   - `python scripts/grade_batch.py data/ba101_submissions/week_1 ba101_week_1 BA101 --anonymize --csv-out artifacts/ba101_week1_grades.csv`
+
+  - `--anonymize`: basic redaction of emails/phones/IDs before sending
+  - `--points`: set points possible (default 40.0)
+  - `--top-k-rubric`, `--top-k-feedback`: retrieval sizes (defaults 6)
+  - `--server`: override server base URL (default http://localhost:8000)
+
+- Output:
+  - Console logs include `request_id`, `rubric_id`, and citation count
+  - Optional CSV contains file, request_id, rubric_id, score_low/high, and suggested_feedback
+
 
