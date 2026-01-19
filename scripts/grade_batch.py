@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batch Grading CLI
+Assessment Workflow – Batch Grading
 Processes directories of submissions (.txt, .docx, .pdf) for grading.
 
 Features:
@@ -21,6 +21,7 @@ Extracted text goes to: artifacts/extraction_store/
 import argparse
 import json
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -60,8 +61,34 @@ def read_text(path: Path) -> Tuple[str, List[str], str]:
         if Document is None:
             raise RuntimeError("python-docx is not installed")
         doc = Document(path)
+        # First, try extracting responses from two-column tables (question | response)
+        responses: List[str] = []
+        try:
+            for table in doc.tables:
+                if len(table.rows) == 0 or len(table.columns) < 2:
+                    continue
+                # Skip header row if it looks like a header
+                start_row = 0
+                first_cell_text = (table.rows[0].cells[0].text or "").strip().lower()
+                if "question" in first_cell_text or "prompt" in first_cell_text:
+                    start_row = 1
+                for row_idx in range(start_row, len(table.rows)):
+                    row = table.rows[row_idx]
+                    if len(row.cells) >= 2:
+                        response_cell = row.cells[1]
+                        response_text = (response_cell.text or "").strip()
+                        if response_text:
+                            responses.append(response_text)
+        except Exception:
+            # Fall through to paragraph extraction on any table parsing issue
+            responses = []
+        if responses:
+            text = "\n\n".join(responses)
+            warnings.append("docx_table_extraction")
+            return text, warnings, "docx_table"
+        # Fallback: use paragraphs if no table responses found
         paras = [(p.text or "").strip() for p in doc.paragraphs if (p.text or "").strip()]
-        text = "\n".join(paras)
+        text = "\n\n".join(paras)
         return text, warnings, "docx_paragraphs"
     
     if suffix == ".pdf":
@@ -73,18 +100,182 @@ def read_text(path: Path) -> Tuple[str, List[str], str]:
             t = (page.extract_text() or "").strip()
             if t:
                 parts.append(t)
-        text = "\n".join(parts)
+        text = "\n\n".join(parts)
         return text, warnings, "pdf_pypdf"
     
     raise RuntimeError(f"unsupported_file_type:{suffix}")
 
 
+def _shared_block_patterns() -> List[str]:
+    """Block patterns matching boilerplate text - same as extract_responses.py"""
+    return [
+        r"Note:\s+To\s+edit\s+this\s+document.*?visible\.",
+        r"Week\s+1\s+Business\s+Activity:.*?submit\s+your\s+assignment!?",
+        r"Answer\s+each\s+question\s+in\s+the\s+box\s+below.*?submit\s+your\s+assignment!?",
+        r"\(Box\s+will\s+expand\s+as\s+you\s+type\)",
+        r"1\.\s+What\s+are\s+the\s+factors\s+of\s+production\s+needed\s+by\s+a\s+surfboard\s+manufacturer\?",
+        r"2\.\s+Where\s+does\s+the\s+surfboard\s+company\s+get\s+these\s+factors\s+of\s+production\?",
+        r"3\.\s+Where\s+does\s+the\s+company\s+get\s+money\s+to\s+pay\s+for\s+additional\s+resources\?",
+    ]
+
+
+def _clean_common_boilerplate(text: str) -> Tuple[str, List[str]]:
+    """Remove boilerplate patterns - same as extract_responses.py"""
+    removed: List[str] = []
+    cleaned = text
+    for pat in _shared_block_patterns():
+        new_cleaned, n = re.subn(pat, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+        if n > 0:
+            removed.append(f"pattern:{pat} count:{n}")
+            cleaned = new_cleaned
+    # Normalize spaces while preserving paragraph breaks (\n\n)
+    # Split on double newline, normalize each paragraph, then rejoin
+    paras = cleaned.split("\n\n")
+    normalized_paras = [re.sub(r"\s+", " ", p).strip() for p in paras if p.strip()]
+    cleaned = "\n\n".join(normalized_paras)
+    return cleaned, removed
+
+
+def _remove_instruction_relics(text: str) -> str:
+    """Remove known assignment instruction boilerplate and relics.
+    
+    Uses the proven logic from extract_responses.py:
+    Apply block patterns, then normalize whitespace while preserving paragraph breaks.
+    """
+    cleaned, _ = _clean_common_boilerplate(text)
+    return cleaned
+
+def _question_prompt_patterns() -> List[str]:
+    """Question prompt patterns to split responses"""
+    return [
+        r"what\s+are\s+the\s+factors\s+of\s+production\s+needed\s+by\s+a\s+surfboard\s+manufacturer",
+        r"where\s+does\s+the\s+surfboard\s+company\s+get\s+these\s+factors\s+of\s+production",
+        r"where\s+does\s+the\s+company\s+get\s+money\s+to\s+pay\s+for\s+additional\s+resources",
+    ]
+
+
+def _split_by_prompts(raw_text: str, prompt_patterns: List[str]) -> List[str]:
+    """Split text by question prompts"""
+    if not prompt_patterns:
+        return []
+    combined = "|".join(f"({p})" for p in prompt_patterns)
+    matches = list(re.finditer(combined, raw_text, flags=re.IGNORECASE | re.DOTALL))
+    if not matches:
+        return []
+    segments: List[str] = []
+    for i, m in enumerate(matches):
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(raw_text)
+        seg = raw_text[start:end].strip()
+        if seg:
+            segments.append(seg)
+    return segments
+
+
+def _strip_leading_bullets(text: str) -> str:
+    """Remove stray bullet-like markers (e.g., '?', '•') at paragraph starts"""
+    if not text:
+        return text
+    bullet_re = re.compile(r"^[\?\u2022\u2023\u2043\u25E6\-\u2013\u2014\*]+\s*")
+    paras = text.split("\n\n")
+    cleaned = [bullet_re.sub("", p.strip()) for p in paras]
+    return "\n\n".join(cleaned).strip()
+
+
+
 def clean_text(raw: str) -> str:
-    """Normalize whitespace while preserving paragraph breaks (double newlines)."""
-    # Split into paragraphs, clean each, rejoin with double newlines
-    paragraphs = raw.split('\n\n')
-    cleaned_paras = [" ".join(p.split()).strip() for p in paragraphs if p.strip()]
-    return "\n\n".join(cleaned_paras)
+    """Remove boilerplate, normalize whitespace, preserve paragraph structure.
+    
+    Uses the complete logic from extract_responses.py:
+    1. Remove block pattern boilerplate
+    2. Filter line-level keywords
+    3. Split by question prompts if available
+    4. Reflow into paragraphs
+    5. Strip bullets and normalize
+    """
+    # Apply block patterns first
+    cleaned = raw
+    block_patterns = _shared_block_patterns()
+    for bp in block_patterns:
+        cleaned = re.sub(bp, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Line-level keyword blocklist
+    keyword_blocklist = [
+        "Note: To edit this document",
+        "Week 1 Business Activity: Factors in Producing a Surfboard",
+        "Use the information from Chapter",
+        "Answer each question in the box below",
+        "assignment drop box",
+        "D2L Brightspace",
+    ]
+    
+    compiled_prompts = [re.compile(p, re.IGNORECASE) for p in _question_prompt_patterns()]
+    
+    def is_template_line(ln: str) -> bool:
+        low = ln.lower()
+        if not low:
+            return False
+        # Remove page numbers
+        if re.match(r"^\s*page\s*\d+\s*$", low):
+            return True
+        # Keyword blocklist
+        for kw in keyword_blocklist:
+            if kw.lower() in low:
+                return True
+        # Question prompts
+        for rx in compiled_prompts:
+            if rx.search(low):
+                return True
+        return False
+    
+    # Split by question prompts
+    prompt_patterns = _question_prompt_patterns()
+    prompt_splits = _split_by_prompts(cleaned, prompt_patterns)
+    
+    # Helper to reflow lines into paragraphs
+    def _reflow_lines_to_paragraphs(ls: List[str]) -> str:
+        paragraphs: List[str] = []
+        buf: List[str] = []
+        for ln in ls:
+            s = ln.strip()
+            if not s:
+                if buf:
+                    para = " ".join(buf)
+                    para = re.sub(r"\s+", " ", para).strip()
+                    paragraphs.append(para)
+                    buf = []
+                continue
+            if s.endswith("-"):
+                buf.append(s[:-1])
+            else:
+                buf.append(s)
+        if buf:
+            para = " ".join(buf)
+            para = re.sub(r"\s+", " ", para).strip()
+            paragraphs.append(para)
+        return "\n\n".join(paragraphs)
+    
+    # Process prompt splits if available
+    if prompt_splits:
+        cleaned_chunks = []
+        for chunk in prompt_splits:
+            chunk_lines = [ln.strip() for ln in chunk.splitlines() if ln.strip()]
+            chunk_lines = [ln for ln in chunk_lines if not is_template_line(ln)]
+            chunk_text = _reflow_lines_to_paragraphs(chunk_lines).strip()
+            chunk_text, _ = _clean_common_boilerplate(chunk_text)
+            chunk_text = _strip_leading_bullets(chunk_text)
+            if chunk_text:
+                cleaned_chunks.append(chunk_text)
+        if cleaned_chunks:
+            return "\n\n".join(cleaned_chunks)
+    
+    # Fallback if no prompt splits
+    lines = [ln.strip() for ln in cleaned.splitlines()]
+    cleaned_lines = [ln for ln in lines if not is_template_line(ln)]
+    out_text = _reflow_lines_to_paragraphs(cleaned_lines).strip()
+    out_text, _ = _clean_common_boilerplate(out_text)
+    out_text = _strip_leading_bullets(out_text)
+    return out_text or ""
 
 
 def count_paragraphs(cleaned_text: str) -> int:
@@ -98,13 +289,25 @@ def apply_quality_gates(
     cleaned_text: str, 
     extraction_warnings: List[str], 
     min_words: int = 30, 
-    min_ratio: float = 0.2
+    min_ratio: float = 0.15
 ) -> Tuple[str, List[str]]:
     """Apply quality checks to determine if submission should be graded.
     
     Returns: (status, reasons)
     - status: "OK_FOR_GRADING" or "NEEDS_REVIEW"
     - reasons: List of issues found
+    
+    Quality Gates:
+    - min_words: 30 (reject extremely short responses)
+    - min_ratio: 0.15 (15% retention after boilerplate removal)
+    
+    Threshold History:
+    - 2026-01-19: Reduced min_ratio from 0.20 to 0.15
+      Reason: PDFs with heavy boilerplate (headers, instructions) were flagged
+      as NEEDS_REVIEW despite containing valid 3-paragraph responses.
+      Example: anon-041-raw.pdf had 1764→345 chars (19.5%) but was complete.
+      New threshold allows concise responses while word count gate (30) prevents
+      truly empty submissions.
     """
     reasons: List[str] = []
     word_count = len(cleaned_text.split())
@@ -124,12 +327,45 @@ def apply_quality_gates(
     return "OK_FOR_GRADING", reasons
 
 
-def grade_submission(server: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Call grading API endpoint."""
-    resp = requests.post(f"{server}/tier2/feedback-suggest", json=payload, timeout=300)
-    if resp.status_code != 200:
-        raise RuntimeError(f"grade_request_failed:{resp.status_code}:{resp.text[:200]}")
-    return resp.json()
+def grade_submission(server: str, payload: Dict[str, Any], retries: int = 3) -> Dict[str, Any]:
+    """Call grading API endpoint with retry logic for connection failures.
+    
+    Note: OpenAI API calls can take >120s on overloaded systems; timeout is 300s.
+    """
+    import time as time_module
+    
+    last_error = None
+    for attempt in range(retries):
+        try:
+            logger.info(f"Grading attempt {attempt + 1}/{retries}: payload_size={len(json.dumps(payload))} bytes")
+            resp = requests.post(
+                f"{server}/tier2/feedback-suggest", 
+                json=payload, 
+                timeout=300  # Increased to 300s to allow OpenAI API latency
+            )
+            logger.info(f"Grading attempt {attempt + 1} succeeded: status={resp.status_code}")
+            if resp.status_code != 200:
+                raise RuntimeError(f"grade_request_failed:{resp.status_code}:{resp.text[:200]}")
+            return resp.json()
+        except (requests.Timeout, requests.ConnectionError, OSError, IOError, requests.RequestException) as e:
+            last_error = e
+            logger.warning(f"Grading attempt {attempt + 1} error: {type(e).__name__}: {str(e)[:150]}")
+            if attempt < retries - 1:
+                wait_time = 5 * (attempt + 1)
+                logger.warning(
+                    f"Retrying in {wait_time}s..."
+                )
+                time_module.sleep(wait_time)
+            else:
+                logger.error(f"Grading API request failed after {retries} attempts")
+                raise RuntimeError(f"grade_request_failed_after_retries:{str(e)[:200]}") from e
+        except Exception as e:
+            # Other errors (JSON parsing, HTTP 500, etc.) don't retry
+            logger.error(f"Grading attempt {attempt + 1} non-retryable error: {type(e).__name__}: {str(e)[:150]}")
+            raise RuntimeError(f"grade_request_failed:{str(e)[:200]}") from e
+    
+    # Should not reach here
+    raise RuntimeError(f"grade_request_failed_unknown:{last_error}")
 
 
 def persist_cleaned_text(cleaned_text: str, path: Path, overwrite: bool) -> None:
@@ -284,6 +520,9 @@ def run_batch(args: argparse.Namespace) -> Dict[str, Any]:
 
             # Grade if requested and quality is acceptable
             if quality_status == "OK_FOR_GRADING" and args.grade:
+                # Add throttle delay to prevent overwhelming server
+                time.sleep(3)
+                logger.info(f"Starting grading for {path.name}...")
                 payload = build_payload(cleaned_text, args)
                 grade_data = grade_submission(args.server, payload)
                 
@@ -347,7 +586,7 @@ def run_batch(args: argparse.Namespace) -> Dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    ap = argparse.ArgumentParser(description="Batch ingestion and grading runner")
+    ap = argparse.ArgumentParser(description="Assessment Workflow: Batch Grading runner")
     ap.add_argument("input_dir", help="Directory containing submission files (.txt/.docx/.pdf)")
     ap.add_argument("--assignment-id", dest="assignment_id", required=True)
     ap.add_argument("--course-id", dest="course_id", required=True)
