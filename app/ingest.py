@@ -42,3 +42,51 @@ def ingest_pdf(
         embeddings=embeddings,
         metadatas=metadatas,
     )
+def ingest_docx(
+    path: str,
+    table: str,
+    source_label: Optional[str] = None,
+    base_metadata: Optional[Dict[str, Any]] = None,
+) -> int:
+    """Ingest a DOCX file, preserving heading hierarchy in chunks and metadata."""
+    from .docx_reader import read_docx_with_headings
+    
+    source = source_label or path
+    base_metadata = base_metadata or {}
+
+    # Read DOCX with heading structure
+    chunks, heading_metadatas = read_docx_with_headings(path)
+    
+    # Embed chunks
+    embeddings = embed_texts(chunks)
+
+    # Merge base_metadata with per-chunk heading metadata
+    metadatas: List[Dict[str, Any]] = []
+    for i in range(len(chunks)):
+        md = dict(base_metadata)
+        md.update(heading_metadatas[i])  # Add h1, h2, h3, heading_path, source_type, source_file
+        md["chunk_index"] = i
+        metadatas.append(md)
+
+    return insert_chunks(
+        table=table,
+        source=source,
+        chunks=chunks,
+        embeddings=embeddings,
+        metadatas=metadatas,
+    )
+def ingest_by_extension(
+    path: str,
+    table: str,
+    source_label: Optional[str] = None,
+    base_metadata: Optional[Dict[str, Any]] = None,
+) -> int:
+    """
+    Dispatch to ingest_pdf or ingest_docx based on file extension.
+    """
+    if path.lower().endswith(".pdf"):
+        return ingest_pdf(path, table, source_label, base_metadata)
+    elif path.lower().endswith(".docx"):
+        return ingest_docx(path, table, source_label, base_metadata)
+    else:
+        raise ValueError(f"Unsupported file format: {path}. Expected .pdf or .docx")

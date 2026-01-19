@@ -10,6 +10,7 @@ from openai import OpenAI
 
 from .config import OPENAI_API_KEY
 from .embed import embed_texts
+from .db import get_rubric_by_id
 from .retrieval import (
     retrieve_similar,
     retrieve_calibration_examples,
@@ -143,6 +144,8 @@ def _format_citations(
                 "chunk_index": chunk_index,
                 "id": row_id,
                 "distance": distance,
+                # Include underlying metadata so callers can filter (e.g., by assignment_id)
+                "metadata": h.get("metadata", {}),
             }
         )
 
@@ -174,6 +177,36 @@ def _format_calibration(hits: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str,
         )
     return "\n".join(ctx_lines).strip(), cites
 
+def _format_rubric_definition(rubric_def: Optional[Dict[str, Any]]) -> str:
+    """
+    Format rubric definition (criteria, weights, philosophy) for inclusion in prompt.
+    Returns empty string if no rubric definition provided.
+    """
+    if not rubric_def:
+        return ""
+    
+    lines = []
+    lines.append("=== Rubric Definition ===")
+    
+    title = rubric_def.get("title", "Untitled Rubric")
+    lines.append(f"Title: {title}")
+    
+    # Philosophy (grading approach)
+    philosophy = rubric_def.get("philosophy_text")
+    if philosophy:
+        lines.append(f"\nPhilosophy:\n{philosophy}")
+    
+    # Criteria with weights
+    criteria = rubric_def.get("criteria_json", {})
+    weights = rubric_def.get("weights_json", {})
+    
+    if criteria:
+        lines.append("\nCriteria:")
+        for criterion_name, criterion_desc in criteria.items():
+            weight = weights.get(criterion_name, "N/A")
+            lines.append(f"  - {criterion_name} (weight: {weight}): {criterion_desc}")
+    
+    return "\n".join(lines)
 
 def answer_from_rubric(question: str, top_k: int = 6) -> Dict[str, Any]:
     q_emb = embed_texts([question])[0]
@@ -272,7 +305,59 @@ def suggest_feedback(
             if calibration_hits:
                 calibration_mode = "course"
 
-    rubric_hits = retrieve_similar("rubric_chunks", q_emb, top_k=top_k_rubric) or []
+        # Retrieve rubric chunks filtered by assignment_id (if provided)
+    rubric_metadata_filter = {"assignment_id": assignment_id} if assignment_id else None
+    rubric_hits = retrieve_similar(
+        "rubric_chunks", 
+        q_emb, 
+        top_k=top_k_rubric,
+        metadata_filter=rubric_metadata_filter
+    ) or []
+
+    # -------------------------------------------------
+    # Rubric Definition Retrieval (multi-rubric support)
+    # -------------------------------------------------
+    rubric_definition = None
+    rubric_id = None
+    
+    # Extract rubric_id from the first retrieved chunk's metadata
+    if rubric_hits and len(rubric_hits) > 0:
+        rubric_id = rubric_hits[0].get("metadata", {}).get("rubric_id")
+    
+    # Fallback: if no rubric_id in chunks, try to infer from assignment_id
+    # (This handles legacy data or cases where rubric_id wasn't stored in chunks)
+    if not rubric_id and assignment_id:
+        # Query a chunk by assignment_id to get its rubric_id
+        from .db import get_conn
+        conn = get_conn()
+        try:
+            result = conn.execute("""
+                SELECT metadata->>'rubric_id' as rubric_id
+                FROM public.rubric_chunks
+                WHERE metadata->>'assignment_id' = %s
+                LIMIT 1;
+            """, (assignment_id,)).fetchone()
+            if result and result[0]:
+                rubric_id = result[0]
+        finally:
+            conn.close()
+    
+    # Fetch the full rubric definition from the rubrics table
+    if rubric_id:
+        rubric_definition = get_rubric_by_id(rubric_id)
+        if rubric_definition:
+            logger.info(
+                "Retrieved rubric definition: rubric_id=%s title=%s",
+                rubric_id,
+                rubric_definition.get("title", "N/A")
+            )
+        else:
+            logger.warning(
+                "rubric_id=%s found in chunks but not in rubrics table",
+                rubric_id
+            )
+    
+    # Retrieve feedback examples
     feedback_hits = retrieve_similar(
         "feedback_library",
         q_emb,
@@ -346,9 +431,15 @@ def suggest_feedback(
     else:
         feedback_section = "\nInstructor feedback examples:\n(none retrieved)\n"
 
+    # Format rubric definition (criteria, weights, philosophy)
+    rubric_definition_text = _format_rubric_definition(rubric_definition)
+    rubric_def_section = ""
+    if rubric_definition_text:
+        rubric_def_section = f"\n{rubric_definition_text}\n"
+
     user = f"""Input:
 {question_or_submission}
-
+{rubric_def_section}
 Rubric context:
 {rubric_ctx}
 {feedback_section}
@@ -371,4 +462,6 @@ Calibration examples (anchors):
         "citations": rubric_cites + feedback_cites + calibration_cites,
         "feedback_hits": feedback_hits,
         "calibration_hits": calibration_hits,
+        # Surface rubric_id for downstream logging/traces
+        "rubric_id": rubric_id,
     }

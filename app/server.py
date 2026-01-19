@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from .db import ensure_calibration_table, insert_calibration_examples
 from .embed import embed_texts
 from .qa import answer_from_rubric, suggest_feedback
+from .db import ensure_calibration_table, insert_calibration_examples, insert_grading_trace, get_conn
 from contextlib import asynccontextmanager
 from .grading import compute_score_range_from_calibration_hits
 from .config import ENABLE_SCORE_RANGE, DEMO_MODE
@@ -95,6 +96,8 @@ class FeedbackSuggestResponse(BaseModel):
     input: str
     suggested_feedback: str
     citations: List[Dict[str, Any]]
+    rubric_id: Optional[str] = None
+    assignment_id: Optional[str] = None
     score_range_text: Optional[str] = None
     score_low: Optional[float] = None
     score_high: Optional[float] = None
@@ -209,6 +212,8 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
             assignment_id=payload.assignment_id,
         )
         result["request_id"] = request_id
+        # Echo assignment_id back to clients for traceability
+        result["assignment_id"] = payload.assignment_id
 
     except Exception as e:
         logger.exception(
@@ -230,8 +235,51 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
             result["score_low"] = low
             result["score_high"] = high
             result["points_possible"] = points_possible
+            result["points_possible"] = points_possible
 
+    # ---- store grading trace ----
+    try:
+        if payload.assignment_id:  # Only log if we have assignment context
+            resolved_rubric_id = result.get("rubric_id")
+            if not resolved_rubric_id:
+                # Fallback: resolve rubric_id via rubric_chunks metadata by assignment_id
+                try:
+                    with get_conn() as conn:
+                        cur = conn.cursor()
+                        cur.execute(
+                            """
+                            SELECT metadata->>'rubric_id'
+                            FROM public.rubric_chunks
+                            WHERE metadata->>'assignment_id' = %s
+                            LIMIT 1
+                            """,
+                            (payload.assignment_id,),
+                        )
+                        row = cur.fetchone()
+                        if row and row[0]:
+                            resolved_rubric_id = row[0]
+                except Exception as e:
+                    logger.debug(f"rubric_id fallback lookup failed: {e}")
 
+            insert_grading_trace(
+                request_id=request_id,
+                assignment_id=payload.assignment_id,
+                student_submission_text=payload.text,
+                model_output_feedback=result.get("suggested_feedback"),
+                model_output_score_low=result.get("score_low"),
+                model_output_score_high=result.get("score_high"),
+                rubric_id=resolved_rubric_id,
+                course=course_norm,
+                grader_id=None,  # TODO: extract from auth if available
+                metadata=metadata,
+            )
+            logger.info(f"Stored grading trace for request_id={request_id} rubric_id={resolved_rubric_id}")
+    except Exception as trace_err:
+        # Don't fail the grading request if trace logging fails
+        logger.warning(f"Failed to store grading trace for request_id={request_id}: {trace_err}")
+
+    # ---- logging + cleanup ----
+    elapsed_ms = int((time.time() - t0) * 1000)
     # ---- logging + cleanup ----
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
