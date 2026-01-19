@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Calibration Review CLI
+Assessment Workflow – Calibration Review
 Iterates through batch grading outputs, captures instructor actuals, flags for calibration.
 
 Usage:
   python scripts/calibration_review.py \
     --batch-id ba101_wk1_full \
-    --calibration-id ba101_week1_cal_20260118 \
+    --calibration-id business_activity_week1_cal_20260118 \
     [--start-from 5]  # Resume from submission N (default: auto-detect from review_session.jsonl)
 """
 
@@ -17,20 +17,26 @@ import os
 import requests
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 
 def load_batch_rollup(batch_id: str) -> List[Dict[str, Any]]:
-    """Load batch_rollup.jsonl from artifacts/runs/batches/{batch_id}/reports/debug/"""
-    rollup_path = Path(f"artifacts/runs/batches/{batch_id}/reports/debug/batch_rollup.jsonl")
-    if not rollup_path.exists():
-        raise FileNotFoundError(f"Batch rollup not found: {rollup_path}")
+    """Load graded submissions from canonical directory (deduplicated)"""
+    canonical_dir = Path(f"artifacts/runs/batches/{batch_id}/grading/canonical")
+    if not canonical_dir.exists():
+        raise FileNotFoundError(f"Canonical grading directory not found: {canonical_dir}")
     
     records = []
-    with rollup_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
+    for json_file in sorted(canonical_dir.glob("*.json")):
+        try:
+            with json_file.open("r", encoding="utf-8") as f:
+                record = json.load(f)
+                # Only include graded submissions
+                if record.get("status") == "graded":
+                    records.append(record)
+        except Exception as e:
+            print(f"Warning: Failed to load {json_file.name}: {e}")
+    
     return records
 
 
@@ -93,10 +99,8 @@ def display_submission(record: Dict[str, Any], index: int, total: int) -> None:
     print(input_text[:400] + ("..." if len(input_text) > 400 else ""))
     
     print(f"\n--- AI GRADING ---")
-    score_low = grade.get('score_low', 'N/A')
-    score_high = grade.get('score_high', 'N/A')
-    points_poss = grade.get('points_possible', 40)
-    print(f"AI Score Range: {score_low} - {score_high} (out of {points_poss} points)")
+    points_possible = grade.get('points_possible', 40)
+    print(f"Score Range: {grade.get('score_low', 'N/A')} - {grade.get('score_high', 'N/A')} (out of {points_possible} points)")
     print(f"\nSuggested Feedback:")
     print(grade.get('suggested_feedback', 'N/A'))
     
@@ -108,65 +112,103 @@ def display_submission(record: Dict[str, Any], index: int, total: int) -> None:
         print(f"Structural Adjustments: {structural}")
 
 
-def validate_score(score_str: str, points_possible: float) -> Optional[float]:
-    """Validate and convert score input"""
-    try:
-        score = float(score_str)
-        if 0 <= score <= points_possible:
-            return score
+def select_competency_level(component_name: str, max_points: float) -> Tuple[str, float]:
+    """Prompt instructor to select competency level for a component"""
+    levels = {
+        "1": ("Meets Expectations", 1.0),  # 100% of points
+        "2": ("Needs Improvement", 0.75),  # 75% of points
+        "3": ("Did Not Meet", 0.5),        # 50% of points
+    }
+    
+    print(f"\n{component_name} ({max_points} points possible):")
+    print("  1) Meets Expectations (100%)")
+    print("  2) Needs Improvement (75%)")
+    print("  3) Did Not Meet (50%)")
+    
+    while True:
+        choice = input(f"Select level (1-3): ").strip()
+        if choice in levels:
+            level_name, multiplier = levels[choice]
+            points = max_points * multiplier
+            print(f"  ✓ {level_name}: {points}/{max_points} points")
+            return level_name, points
         else:
-            print(f"✗ Score must be between 0 and {points_possible}")
-            return None
-    except ValueError:
-        print("✗ Score must be a number")
-        return None
+            print("✗ Please enter 1, 2, or 3")
 
 
 def capture_actuals(
     points_possible: float = 40.0,
+    ai_score_low: Optional[float] = None,
+    ai_score_high: Optional[float] = None,
+    flag_for_calibration: bool = False,
+    use_flat_scoring: bool = False,
 ) -> Dict[str, Any]:
-    """Prompt instructor for actual grade + feedback"""
-    actual_score = None
-    while actual_score is None:
-        score_input = input(f"\nYour actual score (0-{points_possible}): ").strip()
-        if not score_input:
-            print("✗ Score is required")
-            continue
-        actual_score = validate_score(score_input, points_possible)
+    """Prompt instructor for actual grade via competency levels + feedback, with optional reasoning
     
-    actual_feedback = input("Your actual feedback: ").strip()
+    Args:
+        points_possible: Maximum points for the assignment (default 40)
+        ai_score_low: AI's low score estimate
+        ai_score_high: AI's high score estimate
+        flag_for_calibration: Whether this is flagged for calibration
+        use_flat_scoring: If True, use single score without component breakdown
+    """
     
-    return {
-        "actual_score": actual_score,
-        "actual_feedback": actual_feedback,
-        "reasoning": None,
-    }
-
-
-def capture_reasoning(
-    actual_score: float,
-    ai_score_low: Optional[float],
-    ai_score_high: Optional[float],
-    flag_for_calibration: bool
-) -> Optional[str]:
-    """Conditionally prompt for reasoning if score differs or flagged for calibration"""
-    should_prompt = False
+    if use_flat_scoring:
+        # Flat scoring mode: single competency level for total score
+        print("\n--- Overall Competency Level (Flat Scoring) ---")
+        overall_level, actual_score = select_competency_level("Overall Performance", points_possible)
+        
+        result = {
+            "actual_score": actual_score,
+            "overall_level": overall_level,
+        }
+    else:
+        # Component-based scoring: Directions (15), Content (15), Style (10)
+        print("\n--- Component Competency Levels ---")
+        
+        directions_level, directions_score = select_competency_level("Adherence to Directions", 15.0)
+        content_level, content_score = select_competency_level("Content Quality", 15.0)
+        style_level, style_score = select_competency_level("Style Guide Compliance", 10.0)
+        
+        actual_score = directions_score + content_score + style_score
+        print(f"\n✓ Total Score: {actual_score}/{points_possible}")
+        
+        result = {
+            "actual_score": actual_score,
+            "component_scores": {
+                "directions": directions_score,
+                "content": content_score,
+                "style": style_score,
+            },
+            "component_levels": {
+                "directions": directions_level,
+                "content": content_level,
+                "style": style_level,
+            },
+        }
+    
+    actual_feedback = input("\nYour actual feedback: ").strip()
+    result["actual_feedback"] = actual_feedback
+    
+    # Conditional reasoning prompt: triggered if score diverges from AI or flagging for calibration
+    reasoning = None
+    should_prompt_reasoning = False
     
     if ai_score_low is not None and ai_score_high is not None:
         if actual_score < ai_score_low or actual_score > ai_score_high:
             print(f"\n⚠ Note: Your score ({actual_score}) differs from AI range ({ai_score_low}-{ai_score_high})")
-            should_prompt = True
+            should_prompt_reasoning = True
     
     if flag_for_calibration:
-        should_prompt = True
+        should_prompt_reasoning = True
     
-    if should_prompt:
+    if should_prompt_reasoning:
         print("\n--- Optional: Why is this a good calibration example? ---")
         print("(e.g., edge case, common pattern, nuance the AI should learn, etc.)")
-        print("Keep it brief: 50-150 words. Focus on the key insight, not full explanation.")
-        return input("Your reasoning (or press Enter to skip): ").strip() or None
+        reasoning = input("Your reasoning (or press Enter to skip): ").strip() or None
     
-    return None
+    result["reasoning"] = reasoning
+    return result
 
 
 def ask_calibration_flag() -> bool:
@@ -249,12 +291,16 @@ def build_ingest_payload(calibration_dir: Path, assignment_id: str, course: str 
         for line in f:
             if line.strip():
                 ex = json.loads(line)
-                examples.append({
+                example = {
                     "submission_text": ex["submission_text"],
                     "feedback_text": ex["instructor_feedback"],
                     "grade_numeric": ex["instructor_score"],
                     "metadata": ex.get("metadata", {})
-                })
+                }
+                # Include component scores if available
+                if ex.get("component_scores"):
+                    example["component_scores"] = ex["component_scores"]
+                examples.append(example)
     
     return {
         "assignment_id": assignment_id,
@@ -273,12 +319,13 @@ def post_to_calibration_api(payload: Dict[str, Any], server: str = "http://local
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Review batch grading outputs and capture instructor actuals for calibration")
+    ap = argparse.ArgumentParser(description="Assessment Workflow: Calibration Review (instructor validation and calibration ingest)")
     ap.add_argument("--batch-id", required=True, help="Batch ID to review")
     ap.add_argument("--calibration-id", required=True, help="Calibration session ID")
     ap.add_argument("--start-from", type=int, default=None, help="Start from submission N (default: auto-resume)")
     ap.add_argument("--server", default="http://localhost:8000", help="API server URL")
     ap.add_argument("--ingest", action="store_true", help="POST flagged examples to /calibration/ingest after review")
+    ap.add_argument("--flat-scoring", action="store_true", help="Use flat scoring (single score) instead of component breakdown")
     args = ap.parse_args()
     
     # Setup calibration directory
@@ -330,33 +377,17 @@ def main():
         display_submission(record, idx, len(records))
         
         points_possible = grade.get("points_possible", 40.0)
-        ai_score_low = grade.get("score_low")
-        ai_score_high = grade.get("score_high")
         
-        # Step 1: Capture actual score and feedback
-        actuals = capture_actuals(points_possible=points_possible)
-        
-        # Step 2: Ask if flagging for calibration
-        flag = ask_calibration_flag()
-        
-        # Step 3: Capture reasoning if applicable (score differs OR flagged)
-        reasoning = capture_reasoning(
-            actual_score=actuals["actual_score"],
-            ai_score_low=ai_score_low,
-            ai_score_high=ai_score_high,
-            flag_for_calibration=flag
+        # Capture actuals FIRST (grade + feedback)
+        actuals = capture_actuals(
+            points_possible=points_possible,
+            ai_score_low=grade.get("score_low"),
+            ai_score_high=grade.get("score_high"),
+            use_flat_scoring=args.flat_scoring,
         )
-        actuals["reasoning"] = reasoning
         
-        # Validate if flagging for calibration
-        if flag:
-            if actuals["actual_score"] is None:
-                print("✗ Cannot flag for calibration: actual_score is missing")
-                flag = False
-            elif not actuals["actual_feedback"]:
-                retry = input("✗ actual_feedback is empty. Add anyway? (y/n): ").strip().lower()
-                if retry != 'y':
-                    flag = False
+        # THEN ask if flagging for calibration
+        flag = ask_calibration_flag()
         
         # Build review record
         review = {
@@ -382,21 +413,32 @@ def main():
         
         # If flagged, build and save calibration example
         if flag:
+            metadata = {
+                "original_filename": record.get("original_filename"),
+                "batch_id": args.batch_id,
+                "paragraph_count": record.get("paragraph_count"),
+                "structural_adjustments": record.get("structural_adjustments", []),
+                "ai_score_low": grade.get("score_low"),
+                "ai_score_high": grade.get("score_high"),
+                "instructor_reasoning": actuals.get("reasoning"),
+                "scoring_mode": "flat" if args.flat_scoring else "component",
+            }
+            # Include component scores and levels if available (component-based mode)
+            if actuals.get("component_scores"):
+                metadata["component_scores"] = actuals["component_scores"]
+            if actuals.get("component_levels"):
+                metadata["component_levels"] = actuals["component_levels"]
+            # Include overall level if available (flat scoring mode)
+            if actuals.get("overall_level"):
+                metadata["overall_level"] = actuals["overall_level"]
+            
             cal_example = {
                 "submission_text": grade.get("input"),
                 "instructor_feedback": actuals["actual_feedback"],
                 "instructor_score": actuals["actual_score"],
                 "assignment_id": record.get("assignment_id"),
                 "rubric_id": grade.get("rubric_id"),
-                "metadata": {
-                    "original_filename": record.get("original_filename"),
-                    "batch_id": args.batch_id,
-                    "paragraph_count": record.get("paragraph_count"),
-                    "structural_adjustments": record.get("structural_adjustments", []),
-                    "ai_score_low": grade.get("score_low"),
-                    "ai_score_high": grade.get("score_high"),
-                    "instructor_reasoning": actuals.get("reasoning"),
-                }
+                "metadata": metadata
             }
             append_calibration_example(cal_example, calibration_dir)
             flagged_count += 1
