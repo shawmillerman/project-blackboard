@@ -124,11 +124,8 @@ def validate_score(score_str: str, points_possible: float) -> Optional[float]:
 
 def capture_actuals(
     points_possible: float = 40.0,
-    ai_score_low: Optional[float] = None,
-    ai_score_high: Optional[float] = None,
-    flag_for_calibration: bool = False,
 ) -> Dict[str, Any]:
-    """Prompt instructor for actual grade + feedback, with optional reasoning for differences"""
+    """Prompt instructor for actual grade + feedback"""
     actual_score = None
     while actual_score is None:
         score_input = input(f"\nYour actual score (0-{points_possible}): ").strip()
@@ -139,29 +136,37 @@ def capture_actuals(
     
     actual_feedback = input("Your actual feedback: ").strip()
     
-    # Conditional reasoning prompt: triggered if score diverges from AI or flagging for calibration
-    reasoning = None
-    should_prompt_reasoning = False
+    return {
+        "actual_score": actual_score,
+        "actual_feedback": actual_feedback,
+        "reasoning": None,
+    }
+
+
+def capture_reasoning(
+    actual_score: float,
+    ai_score_low: Optional[float],
+    ai_score_high: Optional[float],
+    flag_for_calibration: bool
+) -> Optional[str]:
+    """Conditionally prompt for reasoning if score differs or flagged for calibration"""
+    should_prompt = False
     
     if ai_score_low is not None and ai_score_high is not None:
         if actual_score < ai_score_low or actual_score > ai_score_high:
             print(f"\n⚠ Note: Your score ({actual_score}) differs from AI range ({ai_score_low}-{ai_score_high})")
-            should_prompt_reasoning = True
+            should_prompt = True
     
     if flag_for_calibration:
-        should_prompt_reasoning = True
+        should_prompt = True
     
-    if should_prompt_reasoning:
+    if should_prompt:
         print("\n--- Optional: Why is this a good calibration example? ---")
         print("(e.g., edge case, common pattern, nuance the AI should learn, etc.)")
         print("Keep it brief: 50-150 words. Focus on the key insight, not full explanation.")
-        reasoning = input("Your reasoning (or press Enter to skip): ").strip() or None
+        return input("Your reasoning (or press Enter to skip): ").strip() or None
     
-    return {
-        "actual_score": actual_score,
-        "actual_feedback": actual_feedback,
-        "reasoning": reasoning,
-    }
+    return None
 
 
 def ask_calibration_flag() -> bool:
@@ -328,16 +333,20 @@ def main():
         ai_score_low = grade.get("score_low")
         ai_score_high = grade.get("score_high")
         
-        # Ask if flagging for calibration first (to inform reasoning prompt)
+        # Step 1: Capture actual score and feedback
+        actuals = capture_actuals(points_possible=points_possible)
+        
+        # Step 2: Ask if flagging for calibration
         flag = ask_calibration_flag()
         
-        # Now capture actuals with conditional reasoning
-        actuals = capture_actuals(
-            points_possible=points_possible,
+        # Step 3: Capture reasoning if applicable (score differs OR flagged)
+        reasoning = capture_reasoning(
+            actual_score=actuals["actual_score"],
             ai_score_low=ai_score_low,
             ai_score_high=ai_score_high,
             flag_for_calibration=flag
         )
+        actuals["reasoning"] = reasoning
         
         # Validate if flagging for calibration
         if flag:
