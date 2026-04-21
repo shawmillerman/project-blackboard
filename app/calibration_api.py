@@ -12,6 +12,7 @@ class CalibrationExample(BaseModel):
     submission_text: str = Field(..., min_length=3)
     feedback_text: str = Field(..., min_length=3)
     grade_numeric: Optional[float] = None
+    component_scores: Optional[Dict[str, float]] = Field(None, description="Component-level scores (directions, content, style)")
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -36,6 +37,9 @@ def ingest_calibration(payload: CalibrationIngestRequest):
             md.setdefault("course", payload.course)
         if payload.rubric_version:
             md.setdefault("rubric_version", payload.rubric_version)
+        # Include component scores in metadata if provided
+        if ex.component_scores:
+            md["component_scores"] = ex.component_scores
         metadatas.append(md)
 
     inserted = insert_calibration_examples(

@@ -1,4 +1,16 @@
 # -----------------------
+# Private / internal dev notes
+# -----------------------
+README_PRIVATE.md
+CHATGPT_HANDOFF_SUMMARY.md
+COPILOT_HANDOFF_NEXT_THREAD.md
+MULTI_INSTITUTION_AUDIT.md
+CALIBRATION_REVIEW_TESTING_SESSION.md
+project_states/
+*_HANDOFF_*.md
+*_PRIVATE.md
+
+# -----------------------
 # Python / Virtual env
 # -----------------------
 .venv/

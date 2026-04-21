@@ -329,18 +329,23 @@ def suggest_feedback(
     if not rubric_id and assignment_id:
         # Query a chunk by assignment_id to get its rubric_id
         from .db import get_conn
-        conn = get_conn()
         try:
-            result = conn.execute("""
-                SELECT metadata->>'rubric_id' as rubric_id
-                FROM public.rubric_chunks
-                WHERE metadata->>'assignment_id' = %s
-                LIMIT 1;
-            """, (assignment_id,)).fetchone()
-            if result and result[0]:
-                rubric_id = result[0]
-        finally:
-            conn.close()
+            with get_conn() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT metadata->>'rubric_id' as rubric_id
+                    FROM public.rubric_chunks
+                    WHERE metadata->>'assignment_id' = %s
+                    LIMIT 1;
+                    """,
+                    (assignment_id,),
+                )
+                result = cur.fetchone()
+                if result and result[0]:
+                    rubric_id = result[0]
+        except Exception as e:
+            logger.debug(f"rubric_id fallback lookup failed: {e}")
     
     # Fetch the full rubric definition from the rubrics table
     if rubric_id:
@@ -408,22 +413,30 @@ def suggest_feedback(
     system = (
         "You are Project Blackboard, an instructor assistant. "
         f"{feedback_note}"
-        "Your job is to draft suggested instructor feedback (not a grade). "
+        "Your job is to draft suggested instructor feedback with component-level evaluation. "
         "Ground everything in the rubric context and the instructor feedback examples provided. "
-        "Do not assign points, letter grades, or final judgments. "
-        "If evidence is insufficient, say what is missing and ask one follow-up question. "
-        "Always include citations like [R1] or [F2] after the sentence they support. "
-        "Write a short instructor-style feedback note, 2–3 sentences total, Maximum 60 words total. "
-        "Sentence 1 should acknowledge one specific strength. "
-        "Sentence 2 should identify the most important improvement. "
-        "Sentence 3 (optional) may suggest a concrete next step. "
-        "Do not use headings or labels. Write as a brief paragraph. "
-        "When calibration examples are provided, treat them as the authoritative standard for tone, strictness, and expectations. "
-        "If there is any ambiguity, default to the patterns demonstrated in the calibration examples. "
-        "Do not be more lenient than the calibration examples. "
-        "If the writing style seems inconsistent or overly polished compared to typical student voice, "
-        "include a brief voice caution note without accusing the student. "
-        "Only include Voice caution when there is strong evidence of AI-generated or copy-pasted tone mismatch, otherwise omit it. "
+        "\n\n"
+        "COMPONENT EVALUATION (required):\n"
+        "Evaluate each rubric component and provide a score range for each:\n"
+        "1. Adherence to Directions (0-15 points): Assess formatting, structure, citation compliance, length requirements\n"
+        "2. Content Quality (0-15 points): Assess understanding, depth, accuracy, completeness of concepts\n"
+        "3. Style Guide Compliance (0-10 points): Assess clarity, conciseness, professional tone, grammar\n"
+        "\n"
+        "For each component, explain WHY points were deducted (if any). Be specific about what's missing or weak.\n"
+        "Format your response as:\n"
+        "COMPONENT SCORES:\n"
+        "Directions: [X-Y]/15 - [brief explanation with citation]\n"
+        "Content: [X-Y]/15 - [brief explanation with citation]\n"
+        "Style: [X-Y]/10 - [brief explanation with citation]\n"
+        "\n"
+        "UNIFIED FEEDBACK:\n"
+        "[2-3 sentence paragraph: acknowledge strength, identify key improvement, suggest next step. Max 60 words. Include citations.]\n"
+        "\n"
+        "GUIDELINES:\n"
+        "- Use narrow ranges (2-3 point spread) when confident; wider ranges (4-6 points) when uncertain\n"
+        "- When calibration examples are provided, treat them as authoritative for tone and strictness\n"
+        "- If writing style seems AI-generated or overly polished, note 'Voice caution' in Style explanation\n"
+        "- Always cite sources [R1], [F2], [C1] after claims\n"
     )
 
     if len(feedback_hits) > 0:

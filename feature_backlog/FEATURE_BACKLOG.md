@@ -1,6 +1,41 @@
 # Feature Backlog
 
+## Recently Completed
+
+- DOCX table response paragraph preservation
+	- Table-cell inner paragraphs now preserved by converting single `\n` to double `\n\n` during extraction so student paragraph breaks are retained.
+	- Change: [scripts/grade_batch.py](scripts/grade_batch.py)
+
+- Calibration review shows cleaned student text (not boilerplate)
+	- During review, if `grade.input` contains assignment boilerplate, it is replaced with the cleaned extraction text for display and calibration payloads.
+	- Change: [scripts/calibration_review.py](scripts/calibration_review.py)
+
+- Rubric-as-Code documentation
+	- Created comprehensive philosophy/marketing document and added Syllabus-as-Code section with data model and integration plan.
+	- Files: [RUBRIC_AS_CODE.md](RUBRIC_AS_CODE.md)
+
+- Quality gates tuned
+	- `min_ratio` lowered to 0.15 (2026-01-19) to reduce false negatives on shorter PDF extractions; documented in code.
+	- Change: [scripts/grade_batch.py](scripts/grade_batch.py)
+
 ## Grading Logic
+
+**P0: Course-material usage scoring policy**
+- New policy: If a response clearly does not use course materials (e.g., no textbook/Chapter references or domain concepts), cap the relevant component at 11.25 (Needs Improvement). If the response is a one-word/no answer/incomplete sentence, cap at 7.5 (Did Not Meet).
+- Scope: Define detection signals (keyword/citation presence, concept usage), integrate into component scoring (primarily Content), and surface rationale in feedback.
+- Tasks:
+	- Implement detection heuristics (keywords/citations) with clear, overrideable flags.
+	- Add explicit feedback note when deduction applied (transparency for students).
+	- Add toggle/config per assignment to enable/disable this rule.
+	- Update documentation and calibration review prompts to reflect policy.
+
+**P0: Rubric version tagging and migration plan**
+- Store `rubric_version` in grading traces, calibration examples, and batch metadata. Resolve rubric by (institution_id, course_id, assignment_id, term_id) → rubric_id + rubric_version.
+- Provide CLI or documented flow to re-grade an existing batch with a new rubric version (`--overwrite`), with audit trail.
+- Tasks:
+	- Add `rubric_version` to API responses and persistence.
+	- Document upgrade path and re-grade decision checklist.
+	- Display rubric_version in calibration review header for clarity.
 
 **P0: Paragraph count rule edge cases**
 - Currently only checks if < 3 paragraphs. Need to handle edge cases: empty paragraphs, single-word stubs, heavily boilerplate-stripped submissions.
@@ -29,15 +64,77 @@
 - When downgrade occurs, include a short audit trail in the record: original score, rule triggered, count/evidence.
 - Support instructor "override" or "dismiss" in future UI.
 
+## Multi-Institution & Dimensional Scoping
+
+**P0: Institution ID scoping (hard stop for multi-tenant)**
+- Currently no institution/school field; all data assumed single institution (Portland CC).
+- Add `institution_id` as mandatory scoping field in calibration_examples, rubrics, grading_traces to prevent inter-institutional data mixing.
+- All retrieval queries must filter by institution_id (not optional); enforce in schema with NOT NULL + index.
+- Update API request payloads to accept `institution_id` (optional per user, default per tenant).
+
+**P0: Term / Academic Year tracking**
+- Currently no term or semester scoping; same assignment_id reused across years with potentially different rubric versions.
+- Add `term_id` (e.g., "fall_2025", "spring_2026") and `academic_year` to calibration, rubrics, batch metadata, and grading_traces.
+- Prevent silent rubric drift by associating rubric_version with term_started + term_ended; audit trail shows which rubric version was active per term.
+- Retrieval logic should respect term boundaries (optionally include current term + immediate prior term for fallback).
+
+**P0: Rubric version metadata (complete)**
+- Add to rubrics table: `rubric_version`, `rubric_status` ("active"|"deprecated"|"draft"), `rubric_created_at`, `rubric_deprecated_at`.
+- Store `rubric_version` in grading_traces and calibration_examples for full audit trail (answers "which rubric version graded this submission?").
+- Manifest-driven resolution: (institution_id, course_id, assignment_id, term_id) → rubric_id + rubric_version.
+
+**P0: Grader / Instructor ID capture**
+- Currently `grading_traces.grader_id` always NULL; not captured from API.
+- Add `grader_id` to `/tier2/feedback-suggest` request payload (optional); store in grading_traces and calibration_examples metadata.
+- Enables instructor-specific drift detection and instructor-scoped calibration retrieval (optional feature).
+
+**P1: Department / Program scoping**
+- Add `department_code` or `department_id` to rubrics, calibration metadata, and grading_traces.
+- Prevents cross-department calibration leakage in multi-department institutions (e.g., Business vs. Engineering).
+- Optionally filter calibration retrieval by department.
+
+**P1: Section / Cohort / Modality separation**
+- Add optional `section_id`, `modality` ("in-person"|"online"|"hybrid"), or `cohort_id` to calibration metadata and batch records.
+- Allows cohort-specific calibration if grading standards differ by modality (e.g., online students may have different engagement expectations).
+- Optional filter in retrieval logic.
+
+**P1: Campus / Location scoping**
+- Add `campus_id` or `campus_code` to batch metadata, calibration metadata, and grading_traces (for multi-campus institutions).
+- Data privacy + audit trail: ensures submissions from Campus A cannot accidentally be graded using Campus B's calibration.
+
+**P2: Calibration confidence tier (evidence level)**
+- Add `calibration_confidence` or `evidence_level` ("exemplar"|"typical"|"draft"|"consensus") to calibration metadata.
+- "exemplar" = single instructor, high confidence; "typical" = multiple submissions, consistent; "draft" = unreviewed; "consensus" = 3+ instructor agreement.
+- Use in retrieval: optionally weight or filter by confidence tier; prevent low-confidence anchors from dominating small top-k sets.
+
+**P2: Student ID / Anonymization mapping**
+- Add `student_id` or `student_anon_id` to grading_traces (for longitudinal tracking).
+- Support stable anonymization scheme for privacy/FERPA compliance (see Analytics & Insights).
+- Batch metadata should include student_id mapping table or manifest.
+
+**P2: Delivery method / Synchronicity**
+- Add `delivery_method` ("synchronous"|"asynchronous"|"hybrid") to calibration metadata and batch context.
+- Async courses may have different feedback expectations; optional filter in retrieval to avoid cross-method contamination.
+
 ## Rubrics
 
-**P0: Rubric resolution mechanism**
-- Currently hardcoded assignment_id → rubric_id flow. Need robust resolution: (course_id, assignment_id, week) → rubric version.
-- Store in a manifest or lookup table (e.g., in `data/` or Supabase).
+**P0: Syllabus-as-Code (MVP)**
+- Encode course learning outcomes (LOs) as structured config (JSON) with week mapping, detection signals, and success criteria.
+- Compute LO-alignment per submission and include in grading traces and calibration metadata.
+- Tasks:
+	- Create `docs/syllabus_ba101.json` with LOs and signals.
+	- Load syllabus in app config; pass into grading.
+	- Return `learning_outcomes_alignment` in API response; show in calibration review.
+	- Document instructor workflow and reporting.
 
-**P0: Rubric versioning**
-- No mechanism to track which submissions were graded with which rubric version.
-- Add rubric_version to batch metadata and grading record.
+**P0: Rubric resolution mechanism**
+- Currently hardcoded assignment_id → rubric_id flow. Need robust resolution: (institution_id, course_id, assignment_id, term_id) → rubric_id + rubric_version.
+- Store in a manifest or lookup table (e.g., `data/rubric_manifest.json` or Supabase table).
+- Include term bounds so historical queries return correct rubric version.
+
+**P0: Rubric versioning (see Multi-Institution section for full spec)**
+- Add rubric_version, rubric_status, rubric_created_at, rubric_deprecated_at to rubrics table.
+- Store rubric_version in batch metadata and grading_traces; all calibration examples tagged with rubric_version for audit trail.
 
 **P1: Rubric definition storage**
 - Currently rubric is ad-hoc prose. Migrate to structured format (YAML/JSON) in `data/rubrics/`.
@@ -57,6 +154,28 @@
 - Current flag `calibration_opt_in` is in code but not integrated with server grading flow.
 - Define when/how a submission is marked OK_FOR_CALIBRATION vs OK_FOR_GRADING.
 
+**P0: Week-first calibration fallback (assignment-safe)**
+- Ensure each week has its own calibration set; use course-level calibration only when that week has fewer than 3 anchors.
+- When falling back, require rubric_id and rubric_version alignment (or explicit allowlist) to prevent cross-assignment contamination.
+- When no calibration exists, fall back to `feedback_library` (generic examples) and log the fallback path for auditability.
+- Add guardrails/tests so cross-week anchors stop being used once week-level coverage is sufficient.
+
+**P0: Calibration ingest completeness for scoring**
+- Require `grade_numeric` for calibration ingestion (or exclude ungraded examples from range calculations) and reject obviously invalid submissions/feedback (too short, empty).
+- Enforce rubric-aligned metadata (`assignment_id`, `rubric_id`, `rubric_version`) on ingest to keep anchors scoped.
+
+**P0: Calibration hit quality guardrails**
+- Deduplicate calibration hits (by normalized submission text and source/chunk) and drop hits beyond a max distance threshold; optionally weight anchors by similarity when building prompts.
+- Prevent small top-k sets from being dominated by near-duplicates or weak matches.
+
+**P0: Component score propagation**
+- Ensure `component_scores` stored in calibration metadata are surfaced to scoring logic so `compute_component_score_ranges` uses real component data instead of falling back to full ranges.
+- Add a small adapter to lift metadata into top-level fields (or update the function to read from metadata).
+
+**P1: Stable score ranges from full calibration set**
+- Compute score ranges from the full graded calibration set for the assignment (and optionally course) instead of only the retrieved top-k; keep retrieval for prompt context but use aggregate stats for ranges.
+- Reduces noise/drift when retrieval returns a narrow or unrepresentative subset.
+
 **P1: Instructor-specific calibration library**
 - Support per-instructor calibration sets: instructor can flag exemplar submissions for training/consistency.
 - Store calibration examples separately from production grades.
@@ -66,6 +185,11 @@
 
 **P2: Calibration audit trail**
 - When instructor reviews a submission marked for calibration, log feedback, accept/reject, and impact on grader thresholds.
+
+**P1: Refresh feedback_library with cross-week exemplars**
+- Periodically rebuild `feedback_library` using curated exemplars from all weeks (once calibration coverage is stable per week).
+- Include provenance metadata (week, assignment_id, batch_id) and re-embed the library so retrieval stays current.
+- Add a repeatable script/notebook to pull from `calibration_examples` → `feedback_library` with versioned dumps.
 
 ## Ingestion & Extraction
 

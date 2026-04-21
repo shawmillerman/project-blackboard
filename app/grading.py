@@ -38,6 +38,60 @@ def _percentile(sorted_vals: List[float], p: float) -> float:
     return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
 
 
+def compute_component_score_ranges(
+    calibration_hits: List[Dict[str, Any]],
+    component_weights: Dict[str, float] = None,
+) -> Dict[str, Dict[str, float]]:
+    """
+    Compute score ranges for each rubric component based on calibration data.
+    
+    Returns:
+      {
+        "directions": {"low": 10.0, "high": 15.0, "max": 15.0},
+        "content": {"low": 8.0, "high": 15.0, "max": 15.0},
+        "style": {"low": 5.0, "high": 10.0, "max": 10.0}
+      }
+    """
+    if component_weights is None:
+        component_weights = {"directions": 15.0, "content": 15.0, "style": 10.0}
+    
+    component_ranges = {}
+    
+    for component, max_pts in component_weights.items():
+        scores = []
+        for h in calibration_hits or []:
+            component_scores = h.get("component_scores", {})
+            score = _safe_float(component_scores.get(component))
+            if score is not None:
+                scores.append(max(0.0, min(max_pts, score)))
+        
+        if len(scores) >= 3:
+            scores.sort()
+            p25 = _percentile(scores, 0.25)
+            p75 = _percentile(scores, 0.75)
+            
+            # Apply minimal widening for components (less than total score)
+            widen = 0.05 * max_pts if len(scores) <= 5 else 0.02 * max_pts
+            
+            low = max(0.0, p25 - widen)
+            high = min(max_pts, p75 + widen)
+            
+            component_ranges[component] = {
+                "low": round(low, 1),
+                "high": round(high, 1),
+                "max": max_pts
+            }
+        else:
+            # Not enough data for this component, use full range
+            component_ranges[component] = {
+                "low": 0.0,
+                "high": max_pts,
+                "max": max_pts
+            }
+    
+    return component_ranges
+
+
 def compute_score_range_from_calibration_hits(
     calibration_hits: List[Dict[str, Any]],
     points_possible: float = 40.0,

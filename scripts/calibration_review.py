@@ -58,6 +58,20 @@ def load_canonical_record(batch_id: str, original_filename: str) -> Optional[Dic
     return None
 
 
+def load_cleaned_text(record: Dict[str, Any]) -> Optional[str]:
+    """Load cleaned text from the extraction store if available."""
+    path = record.get("cleaned_text_path")
+    if not path:
+        return None
+    try:
+        cleaned_path = Path(path)
+        if cleaned_path.exists():
+            return cleaned_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return None
+    return None
+
+
 def enrich_record_with_grade_data(record: Dict[str, Any], batch_id: str) -> Dict[str, Any]:
     """
     Ensure record has grade.input and grade.suggested_feedback.
@@ -361,6 +375,20 @@ def main():
         
         # Enrich with grade data if needed
         record = enrich_record_with_grade_data(record, args.batch_id)
+
+        # Prefer cleaned extraction text when available (removes assignment boilerplate)
+        cleaned_text = load_cleaned_text(record)
+        grade = record.get("grade", {})
+        if cleaned_text:
+            grade_input = grade.get("input") or ""
+            template_markers = [
+                "week 1 business activity",
+                "answer each question in the box",
+                "use the information from chapter",
+            ]
+            if (not grade_input.strip()) or any(m in grade_input.lower() for m in template_markers):
+                grade["input"] = cleaned_text
+                record["grade"] = grade
         
         # Skip if not graded or missing essential data
         if record.get("status") != "graded":

@@ -76,7 +76,13 @@ def read_text(path: Path) -> Tuple[str, List[str], str]:
                     row = table.rows[row_idx]
                     if len(row.cells) >= 2:
                         response_cell = row.cells[1]
+                        # Preserve inner paragraph breaks: convert single \n to \n\n
+                        # This is necessary because cell.text joins inner paragraphs with \n only
                         response_text = (response_cell.text or "").strip()
+                        # Replace single newline with double newline (except already-double ones)
+                        response_text = response_text.replace("\n\n", "\x00PLACEHOLDER\x00")  # Protect existing double newlines
+                        response_text = response_text.replace("\n", "\n\n")  # Convert single to double
+                        response_text = response_text.replace("\x00PLACEHOLDER\x00", "\n\n")  # Restore protected ones
                         if response_text:
                             responses.append(response_text)
         except Exception:

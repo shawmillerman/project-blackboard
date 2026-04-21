@@ -2,6 +2,8 @@
 
 **Goal:** Remove all references to `out/` and `experiments/`, establish new defaults for `artifacts/` and `sandbox/`
 
+> **Strategic Note:** This refactor supports the **[Adaptive Assessment Intelligence (AAI)](ADAPTIVE_ASSESSMENT_INTELLIGENCE_ROADMAP.md)** initiative by establishing clean artifact storage and trace log conventions. Prioritize Phase 4 (artifact structure) to align with AAI Phase 0 requirements.
+
 ---
 
 ## Phase 1: Directory Rename

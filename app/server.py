@@ -17,7 +17,7 @@ from .embed import embed_texts
 from .qa import answer_from_rubric, suggest_feedback
 from .db import ensure_calibration_table, insert_calibration_examples, insert_grading_trace, get_conn
 from contextlib import asynccontextmanager
-from .grading import compute_score_range_from_calibration_hits
+from .grading import compute_score_range_from_calibration_hits, compute_component_score_ranges
 from .config import ENABLE_SCORE_RANGE, DEMO_MODE
 
 # -------------------------------------------------
@@ -229,13 +229,19 @@ def tier2_feedback_suggest_post(request: Request, payload: FeedbackSuggestReques
             result.get("calibration_hits", []),
             points_possible,
         )
+        
+        # Component-level score ranges
+        component_ranges = compute_component_score_ranges(
+            result.get("calibration_hits", []),
+            component_weights={"directions": 15.0, "content": 15.0, "style": 10.0}
+        )
 
         if not DEMO_MODE:
             result["score_range_text"] = score_text
             result["score_low"] = low
             result["score_high"] = high
             result["points_possible"] = points_possible
-            result["points_possible"] = points_possible
+            result["component_ranges"] = component_ranges
 
     # ---- store grading trace ----
     try:
