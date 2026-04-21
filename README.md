@@ -4,6 +4,8 @@
 
 Built with Python, FastAPI, OpenAI, and FAISS. Processes student submissions, retrieves contextually relevant rubric guidance using vector search, and generates structured feedback with citations.
 
+> **Origin story**: This was the first production system I built. After shipping it, I identified the reusable infrastructure patterns (ingestion, embedding, retrieval, calibration) and extracted them into [Launchpad AI](https://github.com/shawmillerman/launchpad_ai) — a general-purpose AI engine for building future apps faster.
+
 ---
 
 ## What It Does
